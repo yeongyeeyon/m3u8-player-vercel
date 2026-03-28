@@ -2,6 +2,10 @@
 
 Signal Deck is a Vercel-ready IPTV player for `.m3u` playlists. It loads a remote playlist, parses channels into a searchable directory, and proxies HLS manifests and segments so channel switching stays inside one player.
 
+The app currently defaults to this mirrored playlist URL:
+
+- `https://3gvchh5vsgxboe2c.private.blob.vercel-storage.com/mirrors/mylist.m3u`
+
 ## What it includes
 
 - Remote playlist loading through `/api/playlist`

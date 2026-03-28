@@ -1,4 +1,4 @@
-const DEFAULT_PLAYLIST_URL = "https://garyshare.sharewithyou.dpdns.org/mylist.m3u";
+const DEFAULT_PLAYLIST_URL = "https://3gvchh5vsgxboe2c.private.blob.vercel-storage.com/mirrors/mylist.m3u";
 const PLAYLIST_OVERRIDE_STORAGE_KEY = "signal-deck-playlist-overrides";
 
 const SAMPLE_PLAYLIST = `#EXTM3U
