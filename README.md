@@ -51,3 +51,13 @@ This repo includes a placeholder at `playlists/mylist.m3u` for the blocked sourc
 Replace that file with the real playlist contents, redeploy, then load:
 
 - `/playlists/mylist.m3u`
+
+## Private Vercel Blob mirror
+
+If your Blob store is private, the app can still load a mirrored playlist through `/api/playlist` as long as your Vercel project has `BLOB_READ_WRITE_TOKEN` available in its environment.
+
+Example private blob URL:
+
+- `https://3gvchh5vsgxboe2c.private.blob.vercel-storage.com/mirrors/mylist.m3u`
+
+Paste that URL into the app's `M3U URL` field after redeploying. The server will attach the bearer token automatically when reading private Vercel Blob URLs.

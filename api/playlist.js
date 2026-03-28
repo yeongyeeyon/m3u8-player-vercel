@@ -16,6 +16,10 @@ function buildResponsePreview(text) {
     .slice(0, 240);
 }
 
+function isPrivateVercelBlob(url) {
+  return /\.private\.blob\.vercel-storage\.com$/i.test(url.hostname);
+}
+
 module.exports = async function handler(req, res) {
   applyCommonHeaders(res);
 
@@ -45,8 +49,14 @@ module.exports = async function handler(req, res) {
 
   try {
     const overrides = readPlaylistOverrides(req);
+    const requestHeaders = getRequestHeaders(req, overrides);
+
+    if (isPrivateVercelBlob(parsedUrl) && process.env.BLOB_READ_WRITE_TOKEN) {
+      requestHeaders.authorization = `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`;
+    }
+
     const upstreamResponse = await fetch(parsedUrl.toString(), {
-      headers: getRequestHeaders(req, overrides)
+      headers: requestHeaders
     });
 
     const text = await upstreamResponse.text();
@@ -77,8 +87,11 @@ module.exports = async function handler(req, res) {
         diagnostic: {
           ...diagnostic,
           responsePreview: buildResponsePreview(text),
-          hint:
-            overrides.referer || overrides.origin || overrides.userAgent
+          hint: isPrivateVercelBlob(parsedUrl)
+            ? process.env.BLOB_READ_WRITE_TOKEN
+              ? "The request used your server-side BLOB_READ_WRITE_TOKEN. If it still failed, verify the blob URL or token scope."
+              : "This is a private Vercel Blob URL. Add BLOB_READ_WRITE_TOKEN to your Vercel project env so the server can read it."
+            : overrides.referer || overrides.origin || overrides.userAgent
               ? "Overrides were sent, so the upstream is likely blocking Vercel itself or requires cookies/session-based access."
               : "Try setting playlist Referer, Origin, or User-Agent overrides. If it still fails, mirror the playlist file to a host you control."
         }
