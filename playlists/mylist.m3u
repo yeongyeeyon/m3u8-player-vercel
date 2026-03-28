@@ -1,0 +1,11 @@
+#EXTM3U
+# Manual mirror placeholder for:
+# https://garyshare.sharewithyou.dpdns.org/mylist.m3u
+#
+# The upstream host currently blocks server-side fetches from this app, so the
+# actual playlist content could not be mirrored automatically.
+#
+# Replace this file with the real M3U contents you obtained manually, then
+# redeploy to Vercel and load:
+# /playlists/mylist.m3u
+

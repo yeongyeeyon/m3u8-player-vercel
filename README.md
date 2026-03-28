@@ -41,3 +41,13 @@ The provided playlist URL currently returns a Cloudflare block page to direct se
 - If diagnostics show HTML or a Cloudflare block page, the host is rejecting server-side requests from Vercel.
 - In that case, the reliable fix is to mirror the `.m3u` file to a host you control and load that mirrored playlist instead.
 - Uploading or pasting the playlist bypasses remote playlist fetching, but stream playback can still fail later if the channel hosts also block proxied requests.
+
+## Manual mirror path
+
+This repo includes a placeholder at `playlists/mylist.m3u` for the blocked source:
+
+- `https://garyshare.sharewithyou.dpdns.org/mylist.m3u`
+
+Replace that file with the real playlist contents, redeploy, then load:
+
+- `/playlists/mylist.m3u`
