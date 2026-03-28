@@ -5,6 +5,7 @@ Signal Deck is a Vercel-ready IPTV player for `.m3u` playlists. It loads a remot
 ## What it includes
 
 - Remote playlist loading through `/api/playlist`
+- Playlist-level `Referer`, `Origin`, and `User-Agent` overrides for sources that reject default proxy requests
 - Local file and raw-text playlist fallback
 - Search and group filters for channel browsing
 - HLS manifest and segment proxying through `/api/proxy`
@@ -33,3 +34,10 @@ This repo does not need a frontend build step. For local development you can run
 ## Important constraint
 
 The provided playlist URL currently returns a Cloudflare block page to direct server-side fetches from this environment. If the same protection blocks Vercel, remote URL loading and proxied playback will fail until the upstream host allows your deployment to fetch the playlist and media.
+
+## Troubleshooting 403 playlist errors
+
+- Try setting the playlist `Referer`, `Origin`, or `User-Agent` in the UI before loading the URL.
+- If diagnostics show HTML or a Cloudflare block page, the host is rejecting server-side requests from Vercel.
+- In that case, the reliable fix is to mirror the `.m3u` file to a host you control and load that mirrored playlist instead.
+- Uploading or pasting the playlist bypasses remote playlist fetching, but stream playback can still fail later if the channel hosts also block proxied requests.

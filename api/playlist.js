@@ -1,6 +1,21 @@
 const { parseM3U } = require("./_lib/m3u");
 const { applyCommonHeaders, getRequestHeaders, isLikelyCloudflareBlock } = require("./_lib/proxy");
 
+function readPlaylistOverrides(req) {
+  return {
+    referer: req.query.referer || "",
+    origin: req.query.origin || "",
+    userAgent: req.query.ua || ""
+  };
+}
+
+function buildResponsePreview(text) {
+  return String(text || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 240);
+}
+
 module.exports = async function handler(req, res) {
   applyCommonHeaders(res);
 
@@ -29,34 +44,67 @@ module.exports = async function handler(req, res) {
   }
 
   try {
+    const overrides = readPlaylistOverrides(req);
     const upstreamResponse = await fetch(parsedUrl.toString(), {
-      headers: getRequestHeaders(req)
+      headers: getRequestHeaders(req, overrides)
     });
 
     const text = await upstreamResponse.text();
-
-    if (!upstreamResponse.ok) {
-      res.status(upstreamResponse.status).json({
-        error: `Upstream playlist request failed with status ${upstreamResponse.status}.`,
-        sourceUrl: parsedUrl.toString()
-      });
-      return;
-    }
+    const diagnostic = {
+      upstreamStatus: upstreamResponse.status,
+      contentType: upstreamResponse.headers.get("content-type") || "",
+      finalUrl: upstreamResponse.url || parsedUrl.toString()
+    };
 
     if (isLikelyCloudflareBlock(text)) {
       res.status(502).json({
         error:
-          "The playlist host returned a Cloudflare block page instead of the M3U file. This will also likely fail from Vercel unless that host allows the deployment to fetch the playlist.",
-        sourceUrl: parsedUrl.toString()
+          "The playlist host returned a Cloudflare block page instead of the M3U file. This usually means the upstream is blocking server-side requests from Vercel.",
+        sourceUrl: parsedUrl.toString(),
+        diagnostic: {
+          ...diagnostic,
+          responsePreview: buildResponsePreview(text),
+          hint: "Header overrides may fix simple anti-hotlinking, but they will not bypass a real Cloudflare bot challenge."
+        }
+      });
+      return;
+    }
+
+    if (!upstreamResponse.ok) {
+      res.status(upstreamResponse.status).json({
+        error: `Upstream playlist request failed with status ${upstreamResponse.status}.`,
+        sourceUrl: parsedUrl.toString(),
+        diagnostic: {
+          ...diagnostic,
+          responsePreview: buildResponsePreview(text),
+          hint:
+            overrides.referer || overrides.origin || overrides.userAgent
+              ? "Overrides were sent, so the upstream is likely blocking Vercel itself or requires cookies/session-based access."
+              : "Try setting playlist Referer, Origin, or User-Agent overrides. If it still fails, mirror the playlist file to a host you control."
+        }
       });
       return;
     }
 
     const channels = parseM3U(text, parsedUrl.toString());
+    if (!channels.length) {
+      res.status(502).json({
+        error: "The upstream response was fetched, but it did not parse as a valid M3U playlist.",
+        sourceUrl: parsedUrl.toString(),
+        diagnostic: {
+          ...diagnostic,
+          responsePreview: buildResponsePreview(text),
+          hint: "If this preview looks like HTML instead of playlist text, the host is returning a block or login page."
+        }
+      });
+      return;
+    }
+
     res.status(200).json({
       sourceUrl: parsedUrl.toString(),
       channelCount: channels.length,
-      channels
+      channels,
+      diagnostic
     });
   } catch (error) {
     res.status(502).json({
@@ -65,4 +113,3 @@ module.exports = async function handler(req, res) {
     });
   }
 };
-

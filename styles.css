@@ -198,6 +198,12 @@ textarea {
   gap: 8px;
 }
 
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .field span {
   color: var(--muted);
   font-size: 0.86rem;
@@ -308,6 +314,7 @@ textarea {
 #channel-source {
   margin: 0;
   line-height: 1.55;
+  white-space: pre-line;
 }
 
 .hint-title {
@@ -503,6 +510,7 @@ textarea {
   }
 
   .action-row,
+  .field-grid,
   .toolbar,
   .meta-grid {
     grid-template-columns: 1fr;

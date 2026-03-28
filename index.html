@@ -57,6 +57,27 @@
               />
             </label>
 
+            <div class="field-grid">
+              <label class="field slim">
+                <span>Playlist Referer</span>
+                <input id="playlist-referer" type="url" placeholder="https://example.com/" autocomplete="off" />
+              </label>
+              <label class="field slim">
+                <span>Playlist Origin</span>
+                <input id="playlist-origin" type="url" placeholder="https://example.com" autocomplete="off" />
+              </label>
+            </div>
+
+            <label class="field slim">
+              <span>Playlist User-Agent</span>
+              <input
+                id="playlist-user-agent"
+                type="text"
+                placeholder="Optional override if the source rejects the default browser UA"
+                autocomplete="off"
+              />
+            </label>
+
             <div class="action-row">
               <button id="load-url-button" type="submit" class="button button-primary">Load URL</button>
               <button id="use-demo-button" type="button" class="button button-ghost">Load Sample</button>
@@ -90,11 +111,16 @@
             <p id="load-status" class="status-text">Waiting for playlist.</p>
           </div>
 
+          <div class="status-card">
+            <p class="status-label">Diagnostics</p>
+            <p id="playlist-diagnostics" class="status-text">No upstream diagnostics yet.</p>
+          </div>
+
           <div class="hint-card">
             <p class="hint-title">Known constraint</p>
             <p class="hint-text">
               If the upstream M3U or channel host is protected by Cloudflare or strict anti-bot rules, Vercel proxy requests may be blocked.
-              Uploading the playlist file still lets you browse locally, but playback depends on the stream host accepting proxied requests.
+              The override fields above can fix simple anti-hotlink checks, but they will not bypass a real bot challenge or CAPTCHA.
             </p>
           </div>
         </section>
@@ -153,4 +179,3 @@
     </div>
   </body>
 </html>
-

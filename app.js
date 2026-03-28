@@ -1,4 +1,5 @@
 const DEFAULT_PLAYLIST_URL = "https://garyshare.sharewithyou.dpdns.org/mylist.m3u";
+const PLAYLIST_OVERRIDE_STORAGE_KEY = "signal-deck-playlist-overrides";
 
 const SAMPLE_PLAYLIST = `#EXTM3U
 #EXTINF:-1 tvg-name="Ocean News" tvg-logo="https://dummyimage.com/256x256/d7f5c4/071106&text=ON" group-title="News",Ocean News
@@ -19,11 +20,15 @@ const state = {
 const elements = {
   playlistForm: document.getElementById("playlist-form"),
   playlistUrl: document.getElementById("playlist-url"),
+  playlistReferer: document.getElementById("playlist-referer"),
+  playlistOrigin: document.getElementById("playlist-origin"),
+  playlistUserAgent: document.getElementById("playlist-user-agent"),
   playlistFile: document.getElementById("playlist-file"),
   playlistRaw: document.getElementById("playlist-raw"),
   loadRawButton: document.getElementById("load-raw-button"),
   useDemoButton: document.getElementById("use-demo-button"),
   loadStatus: document.getElementById("load-status"),
+  playlistDiagnostics: document.getElementById("playlist-diagnostics"),
   channelCount: document.getElementById("channel-count"),
   playlistMode: document.getElementById("playlist-mode"),
   groupFilter: document.getElementById("group-filter"),
@@ -44,6 +49,12 @@ function setStatus(message, tone = "neutral") {
 function setPlaybackStatus(message, tone = "neutral") {
   elements.playbackStatus.textContent = message;
   elements.playbackStatus.style.color = tone === "error" ? "var(--danger)" : tone === "success" ? "var(--accent)" : "";
+}
+
+function setDiagnostics(message, tone = "neutral") {
+  elements.playlistDiagnostics.textContent = message;
+  elements.playlistDiagnostics.style.color =
+    tone === "error" ? "var(--danger)" : tone === "success" ? "var(--accent)" : "";
 }
 
 function decodeMaybe(value) {
@@ -90,6 +101,38 @@ function normalizeHeaderMap(rawHeaders) {
   }
 
   return headers;
+}
+
+function getPlaylistOverrides() {
+  return normalizeHeaderMap({
+    referer: elements.playlistReferer.value.trim(),
+    origin: elements.playlistOrigin.value.trim(),
+    userAgent: elements.playlistUserAgent.value.trim()
+  });
+}
+
+function persistPlaylistOverrides() {
+  try {
+    window.localStorage.setItem(PLAYLIST_OVERRIDE_STORAGE_KEY, JSON.stringify(getPlaylistOverrides()));
+  } catch {
+    // Ignore storage failures and continue without persistence.
+  }
+}
+
+function restorePlaylistOverrides() {
+  try {
+    const savedValue = window.localStorage.getItem(PLAYLIST_OVERRIDE_STORAGE_KEY);
+    if (!savedValue) {
+      return;
+    }
+
+    const overrides = normalizeHeaderMap(JSON.parse(savedValue));
+    elements.playlistReferer.value = overrides.referer || "";
+    elements.playlistOrigin.value = overrides.origin || "";
+    elements.playlistUserAgent.value = overrides.userAgent || "";
+  } catch {
+    // Ignore malformed persisted values.
+  }
 }
 
 function parseM3UText(text, baseUrl) {
@@ -190,6 +233,85 @@ function makeProxyUrl(channel) {
   }
 
   return proxyUrl.toString();
+}
+
+function buildPlaylistRequestUrl(url, overrides) {
+  const requestUrl = new URL("/api/playlist", window.location.origin);
+  requestUrl.searchParams.set("url", url);
+
+  if (overrides.referer) {
+    requestUrl.searchParams.set("referer", overrides.referer);
+  }
+  if (overrides.origin) {
+    requestUrl.searchParams.set("origin", overrides.origin);
+  }
+  if (overrides.userAgent) {
+    requestUrl.searchParams.set("ua", overrides.userAgent);
+  }
+
+  return requestUrl.toString();
+}
+
+function applyPlaylistHeaderFallbacks(channels, overrides) {
+  if (!overrides.referer && !overrides.origin && !overrides.userAgent) {
+    return channels;
+  }
+
+  return channels.map((channel) => ({
+    ...channel,
+    headers: {
+      referer: channel.headers?.referer || overrides.referer || "",
+      origin: channel.headers?.origin || overrides.origin || "",
+      userAgent: channel.headers?.userAgent || overrides.userAgent || ""
+    }
+  }));
+}
+
+function formatOverrideSummary(overrides) {
+  const parts = [];
+
+  if (overrides.referer) {
+    parts.push(`referer=${overrides.referer}`);
+  }
+  if (overrides.origin) {
+    parts.push(`origin=${overrides.origin}`);
+  }
+  if (overrides.userAgent) {
+    parts.push(`ua=${overrides.userAgent}`);
+  }
+
+  return parts.join(" | ");
+}
+
+function formatDiagnosticMessage(payload, overrides, mode = "error") {
+  const lines = [];
+
+  if (mode === "success") {
+    lines.push("Remote playlist fetch succeeded.");
+  }
+
+  if (payload?.diagnostic?.upstreamStatus) {
+    lines.push(`Upstream status: ${payload.diagnostic.upstreamStatus}`);
+  }
+  if (payload?.diagnostic?.contentType) {
+    lines.push(`Content-Type: ${payload.diagnostic.contentType}`);
+  }
+  if (payload?.diagnostic?.finalUrl && payload.diagnostic.finalUrl !== payload?.sourceUrl) {
+    lines.push(`Final URL: ${payload.diagnostic.finalUrl}`);
+  }
+  if (payload?.diagnostic?.hint) {
+    lines.push(payload.diagnostic.hint);
+  }
+  if (payload?.diagnostic?.responsePreview) {
+    lines.push(`Preview: ${payload.diagnostic.responsePreview}`);
+  }
+
+  const overrideSummary = formatOverrideSummary(overrides);
+  if (overrideSummary) {
+    lines.push(`Overrides: ${overrideSummary}`);
+  }
+
+  return lines.join("\n") || "No upstream diagnostics available.";
 }
 
 function updateGroupFilter(channels) {
@@ -300,27 +422,45 @@ function setChannels(channels, sourceMode, sourceLabel) {
 }
 
 async function loadPlaylistFromUrl(url) {
+  const overrides = getPlaylistOverrides();
+  persistPlaylistOverrides();
   setStatus("Fetching playlist through the Vercel proxy...");
   elements.playlistMode.textContent = "Remote URL";
+  setDiagnostics("Testing remote playlist access from the serverless proxy...");
 
-  const response = await fetch(`/api/playlist?url=${encodeURIComponent(url)}`);
-  const payload = await response.json();
+  const response = await fetch(buildPlaylistRequestUrl(url, overrides));
+  const payload = await response.json().catch(() => ({}));
 
   if (!response.ok) {
+    setDiagnostics(formatDiagnosticMessage(payload, overrides), "error");
     throw new Error(payload.error || "Unable to load remote playlist.");
   }
 
-  setChannels(payload.channels || [], "Remote URL", payload.sourceUrl || url);
+  const channels = applyPlaylistHeaderFallbacks(payload.channels || [], overrides);
+  setDiagnostics(formatDiagnosticMessage(payload, overrides, "success"), "success");
+  setChannels(channels, "Remote URL", payload.sourceUrl || url);
 }
 
 async function loadPlaylistFromFile(file) {
+  const overrides = getPlaylistOverrides();
+  persistPlaylistOverrides();
   const text = await file.text();
-  const channels = parseM3UText(text);
+  const channels = applyPlaylistHeaderFallbacks(parseM3UText(text), overrides);
+  setDiagnostics(
+    `Playlist loaded from local file.\nNo remote playlist fetch was required.${formatOverrideSummary(overrides) ? `\nOverrides: ${formatOverrideSummary(overrides)}` : ""}`,
+    "success"
+  );
   setChannels(channels, "Local File", file.name);
 }
 
 function loadPlaylistFromRawText(text) {
-  const channels = parseM3UText(text);
+  const overrides = getPlaylistOverrides();
+  persistPlaylistOverrides();
+  const channels = applyPlaylistHeaderFallbacks(parseM3UText(text), overrides);
+  setDiagnostics(
+    `Playlist loaded from pasted text.\nNo remote playlist fetch was required.${formatOverrideSummary(overrides) ? `\nOverrides: ${formatOverrideSummary(overrides)}` : ""}`,
+    "success"
+  );
   setChannels(channels, "Raw Text", "pasted playlist");
 }
 
@@ -386,11 +526,13 @@ async function playChannel(channel) {
 
 function hydrateSample() {
   elements.playlistRaw.value = SAMPLE_PLAYLIST;
+  setDiagnostics("Sample playlist loaded locally for testing the player UI and stream switching.");
   loadPlaylistFromRawText(SAMPLE_PLAYLIST);
 }
 
 function bindEvents() {
   elements.playlistUrl.value = DEFAULT_PLAYLIST_URL;
+  restorePlaylistOverrides();
 
   elements.playlistForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -438,6 +580,9 @@ function bindEvents() {
   elements.useDemoButton.addEventListener("click", hydrateSample);
   elements.searchInput.addEventListener("input", applyFilters);
   elements.groupFilter.addEventListener("change", applyFilters);
+  elements.playlistReferer.addEventListener("input", persistPlaylistOverrides);
+  elements.playlistOrigin.addEventListener("input", persistPlaylistOverrides);
+  elements.playlistUserAgent.addEventListener("input", persistPlaylistOverrides);
 
   elements.player.addEventListener("playing", () => {
     setPlaybackStatus("Playback in progress.", "success");
