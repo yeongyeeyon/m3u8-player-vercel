@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Signal Deck</title>
+    <meta
+      name="description"
+      content="Load an M3U playlist, browse channels fast, and switch live streams without replacing the player."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js" defer></script>
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <div class="page-shell">
+      <div class="ambient ambient-left"></div>
+      <div class="ambient ambient-right"></div>
+
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Broadcast-grade switchboard</p>
+          <h1>Signal Deck</h1>
+          <p class="hero-text">
+            Load a remote M3U playlist, filter channels instantly, and jump between streams on one persistent HLS player.
+          </p>
+        </div>
+        <div class="hero-badge">
+          <span>Vercel Ready</span>
+          <strong>Proxy + Player</strong>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="panel control-panel">
+          <div class="panel-heading">
+            <p class="panel-kicker">Playlist intake</p>
+            <h2>Source</h2>
+          </div>
+
+          <form id="playlist-form" class="stack">
+            <label class="field">
+              <span>M3U URL</span>
+              <input
+                id="playlist-url"
+                type="url"
+                name="playlistUrl"
+                value="https://garyshare.sharewithyou.dpdns.org/mylist.m3u"
+                placeholder="https://example.com/list.m3u"
+                autocomplete="off"
+              />
+            </label>
+
+            <div class="action-row">
+              <button id="load-url-button" type="submit" class="button button-primary">Load URL</button>
+              <button id="use-demo-button" type="button" class="button button-ghost">Load Sample</button>
+            </div>
+          </form>
+
+          <div class="divider">
+            <span>Fallback</span>
+          </div>
+
+          <div class="stack">
+            <label class="field">
+              <span>Upload M3U File</span>
+              <input id="playlist-file" type="file" accept=".m3u,.m3u8,text/plain" />
+            </label>
+
+            <label class="field">
+              <span>Paste Raw M3U</span>
+              <textarea
+                id="playlist-raw"
+                rows="8"
+                placeholder="#EXTM3U&#10;#EXTINF:-1 tvg-name=&quot;Channel 1&quot; group-title=&quot;News&quot;,Channel 1&#10;https://example.com/live/channel1.m3u8"
+              ></textarea>
+            </label>
+
+            <button id="load-raw-button" type="button" class="button button-secondary">Load Pasted Playlist</button>
+          </div>
+
+          <div class="status-card">
+            <p class="status-label">Status</p>
+            <p id="load-status" class="status-text">Waiting for playlist.</p>
+          </div>
+
+          <div class="hint-card">
+            <p class="hint-title">Known constraint</p>
+            <p class="hint-text">
+              If the upstream M3U or channel host is protected by Cloudflare or strict anti-bot rules, Vercel proxy requests may be blocked.
+              Uploading the playlist file still lets you browse locally, but playback depends on the stream host accepting proxied requests.
+            </p>
+          </div>
+        </section>
+
+        <section class="panel directory-panel">
+          <div class="panel-heading compact">
+            <div>
+              <p class="panel-kicker">Channel directory</p>
+              <h2 id="channel-count">0 channels</h2>
+            </div>
+            <span id="playlist-mode" class="mode-pill">No source</span>
+          </div>
+
+          <div class="toolbar">
+            <label class="field slim">
+              <span>Search</span>
+              <input id="search-input" type="search" placeholder="Filter by name or group" />
+            </label>
+            <label class="field slim">
+              <span>Group</span>
+              <select id="group-filter">
+                <option value="all">All groups</option>
+              </select>
+            </label>
+          </div>
+
+          <div id="channel-list" class="channel-list" aria-live="polite"></div>
+        </section>
+
+        <section class="panel player-panel">
+          <div class="panel-heading compact">
+            <div>
+              <p class="panel-kicker">Live output</p>
+              <h2 id="now-playing">No channel selected</h2>
+            </div>
+            <span id="channel-group" class="mode-pill muted">Idle</span>
+          </div>
+
+          <div class="screen-frame">
+            <div class="scanline"></div>
+            <video id="player" controls playsinline></video>
+          </div>
+
+          <div class="meta-grid">
+            <div class="meta-card">
+              <p class="meta-label">Source</p>
+              <p id="channel-source" class="meta-value">No stream loaded.</p>
+            </div>
+            <div class="meta-card">
+              <p class="meta-label">Playback</p>
+              <p id="playback-status" class="meta-value">Standby</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
+

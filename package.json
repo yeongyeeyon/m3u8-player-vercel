@@ -1,0 +1,14 @@
+{
+  "name": "m3u8-player-vercel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Vercel-ready IPTV player for M3U playlists with HLS proxying",
+  "scripts": {
+    "dev": "vercel dev",
+    "start": "vercel dev"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
+
